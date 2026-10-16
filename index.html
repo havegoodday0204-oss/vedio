@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FLOW 프롬프트 빌더 - 단어선택 + 복사</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 20px; font-family: system-ui, -apple-system, 'Malgun Gothic', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+  .wrap { max-width: 1400px; margin: 0 auto; }
+  h1 { color: #fff; text-align: center; margin-bottom: 10px; font-size: 32px; }
+  .subtitle { color: rgba(255,255,255,0.9); text-align: center; margin-bottom: 20px; font-size: 14px; }
+  
+  .container { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 1200px) { .container { grid-template-columns: 1fr; } }
+  
+  .panel { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+  .panel h2 { font-size: 18px; font-weight: 700; color: #667eea; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+  .panel h2::before { content: attr(data-icon); font-size: 20px; }
+  
+  .section { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #e6e6e6; }
+  .section:last-child { border-bottom: none; }
+  
+  label { display: block; margin-bottom: 12px; font-size: 13px; font-weight: 700; color: #262626; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid #d6d6d6; border-radius: 6px; font-size: 14px;
+    font-family: inherit; resize: vertical;
+  }
+  input[type="text"]:focus, select:focus, textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
+  
+  .checkbox-group, .radio-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .checkbox-item, .radio-item { display: flex; align-items: center; gap: 8px; }
+  input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; cursor: pointer; }
+  
+  .select-tag { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .tag { background: #667eea; color: #fff; padding: 6px 10px; border-radius: 4px; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .tag .remove { cursor: pointer; font-weight: 700; }
+  
+  .button-group { display: flex; gap: 10px; }
+  button { padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 700; transition: all .2s; }
+  .btn-primary { background: #667eea; color: #fff; flex: 1; }
+  .btn-primary:hover { background: #764ba2; transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102,126,234,0.3); }
+  .btn-secondary { background: #e6e6e6; color: #262626; flex: 1; }
+  .btn-secondary:hover { background: #d6d6d6; }
+  .btn-copy { background: #22c55e; color: #fff; }
+  .btn-copy:hover { background: #16a34a; }
+  .btn-download { background: #3b82f6; color: #fff; }
+  .btn-download:hover { background: #2563eb; }
+  
+  .prompt-panel { background: #f8f8f8; border: 2px dashed #667eea; border-radius: 8px; padding: 16px; }
+  .prompt-label { font-size: 12px; font-weight: 700; color: #667eea; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px; }
+  #promptOutput { width: 100%; min-height: 400px; padding: 14px; border: 1px solid #d6d6d6; border-radius: 6px;
+    background: #fff; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; color: #262626;
+    resize: vertical; }
+  
+  .progress-bar { display: flex; gap: 4px; margin-bottom: 20px; }
+  .progress-step { flex: 1; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.3); transition: all .3s; }
+  .progress-step.active { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+  
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: #f0f0f0; padding: 12px; border-radius: 6px; margin-bottom: 16px; }
+  .stat-item { font-size: 13px; }
+  .stat-label { color: #6b6b6b; font-weight: 700; }
+  .stat-value { font-size: 18px; font-weight: 700; color: #667eea; }
+  
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #22c55e; color: #fff; padding: 14px 20px;
+    border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); animation: slideIn .3s ease-out;
+    z-index: 1000; }
+  @keyframes slideIn { from { transform: translateY(100px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  
+  .tab-buttons { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+  .tab-btn { padding: 10px 12px; border: 1px solid #d6d6d6; background: #fff; border-radius: 6px; cursor: pointer; font-weight: 700;
+    font-size: 12px; transition: all .2s; }
+  .tab-btn.active { background: #667eea; color: #fff; border-color: #667eea; }
+  
+  .keyword-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .chip { background: #e8e8ff; color: #667eea; padding: 6px 12px; border-radius: 16px; cursor: pointer; font-size: 12px;
+    border: 1px solid #d6d6d6; transition: all .2s; }
+  .chip:hover { background: #d6d6ff; transform: scale(1.05); }
+  .chip.selected { background: #667eea; color: #fff; border-color: #667eea; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎬 FLOW 프롬프트 빌더</h1>
+  <p class="subtitle">Framing · Length · Output · Workflow — 구조화된 프롬프트를 한 번에 생성하세요</p>
+  
+  <div class="progress-bar">
+    <div class="progress-step active" id="prog1"></div>
+    <div class="progress-step" id="prog2"></div>
+    <div class="progress-step" id="prog3"></div>
+    <div class="progress-step" id="prog4"></div>
+  </div>
+
+  <div class="container">
+    <!-- ===== 좌측: 입력 패널 ===== -->
+    <div>
+      <!-- FRAMING -->
+      <div class="panel">
+        <h2 data-icon="🎯">1. FRAMING (목표 설정)</h2>
+        
+        <div class="tab-buttons">
+          <button class="tab-btn active" onclick="showTab('framing', 0)">역할</button>
+          <button class="tab-btn" onclick="showTab('framing', 1)">목표</button>
+          <button class="tab-btn" onclick="showTab('framing', 2)">타겟</button>
+          <button class="tab-btn" onclick="showTab('framing', 3)">톤</button>
+        </div>
+
+        <div class="section">
+          <label>기관명</label>
+          <input type="text" id="org" placeholder="예: 서귀포시청">
+        </div>
+        
+        <div class="section">
+          <label>정책명</label>
+          <input type="text" id="policy" placeholder="예: 기초생활보장 수급 지원">
+        </div>
+        
+        <div class="section">
+          <label>핵심 메시지 (한 문장)</label>
+          <input type="text" id="message" placeholder="예: 당신은 혼자가 아닙니다">
+        </div>
+
+        <div class="section">
+          <label>역할 선택 (FRAMING - 역할)</label>
+          <div class="keyword-chips" id="roleChips">
+            <span class="chip" onclick="selectKeyword(this, 'role', '공공기관의 영상 크리에이티브 디렉터')">공공기관 영상 디렉터</span>
+            <span class="chip" onclick="selectKeyword(this, 'role', '사회복지 정책 커뮤니케이션 전문가')">복지 정책 전문가</span>
+            <span class="chip" onclick="selectKeyword(this, 'role', '지역 관광 마케팅 브랜드 전략가')">관광 마케터</span>
+            <span class="chip" onclick="selectKeyword(this, 'role', '청년 일자리 정책의 스토리텔러')">일자리 스토리텔러</span>
+            <span class="chip" onclick="selectKeyword(this, 'role', '공익 광고 시나리오 라이터')">공익 광고 작가</span>
+            <span class="chip" onclick="selectKeyword(this, 'role', '지역 경제 활성화 콘텐츠 기획자')">경제 활성화 기획자</span>
+            <span class="chip" onclick="selectKeyword(this, 'role', '국민 참여 유도 캠페인 디렉터')">캠페인 디렉터</span>
+          </div>
+          <div id="selectedRole" class="select-tag"></div>
+        </div>
+
+        <div class="section">
+          <label>영상 목표 (FRAMING - 목표) - 중복선택 가능</label>
+          <div class="keyword-chips">
+            <span class="chip" onclick="selectKeyword(this, 'goal', '정책의 필요성을 국민에게 알린다')">필요성 인지</span>
+            <span class="chip" onclick="selectKeyword(this, 'goal', '타겟층의 공감과 행동을 유도한다')">공감 & 행동</span>
+            <span class="chip" onclick="selectKeyword(this, 'goal', '기관의 신뢰도와 투명성을 높인다')">신뢰도 향상</span>
+            <span class="chip" onclick="selectKeyword(this, 'goal', '정책 수혜자 모집 및 신청 유도')">신청 유도</span>
+            <span class="chip" onclick="selectKeyword(this, 'goal', '사회 인식 개선 및 낙인 제거')">인식 개선</span>
+            <span class="chip" onclick="selectKeyword(this, 'goal', '지역 경제 활성화 이미지 제고')">경제 활성화</span>
+          </div>
+          <div id="selectedGoal" class="select-tag"></div>
+        </div>
+
+        <div class="section">
+          <label>타겟 오디언스</label>
+          <div class="keyword-chips">
+            <span class="chip" onclick="selectKeyword(this, 'target', '청년층 (20~35세)')">청년 (20~35)</span>
+            <span class="chip" onclick="selectKeyword(this, 'target', '저소득층 및 취약계층')">저소득층</span>
+            <span class="chip" onclick="selectKeyword(this, 'target', '고령층 (60대 이상)')">고령층 (60+)</span>
+            <span class="chip" onclick="selectKeyword(this, 'target', '부모층 (30~50세)')">부모층 (30~50)</span>
+            <span class="chip" onclick="selectKeyword(this, 'target', '자영업자 및 소상공인')">자영업자</span>
+            <span class="chip" onclick="selectKeyword(this, 'target', '관광객 및 방문자')">관광객</span>
+            <span class="chip" onclick="selectKeyword(this, 'target', '일반 시민 (전연령)')">전연령</span>
+            <span class="chip" onclick="selectKeyword(this, 'target', '정책 담당자 및 복지사')">담당자</span>
+          </div>
+          <div id="selectedTarget" class="select-tag"></div>
+        </div>
+
+        <div class="section">
+          <label>톤 (Tone) - 중복선택 가능</label>
+          <div class="keyword-chips">
+            <span class="chip" onclick="selectKeyword(this, 'tone', '따뜻함과 공감')">따뜻함 & 공감</span>
+            <span class="chip" onclick="selectKeyword(this, 'tone', '신뢰성과 전문성')">신뢰 & 전문성</span>
+            <span class="chip" onclick="selectKeyword(this, 'tone', '희망과 긍정')">희망 & 긍정</span>
+            <span class="chip" onclick="selectKeyword(this, 'tone', '역동성과 에너지')">역동 & 에너지</span>
+            <span class="chip" onclick="selectKeyword(this, 'tone', '긴급성과 절박함')">긴급성</span>
+            <span class="chip" onclick="selectKeyword(this, 'tone', '자극적이고 임팩트 있게')">임팩트</span>
+          </div>
+          <div id="selectedTone" class="select-tag"></div>
+        </div>
+      </div>
+
+      <!-- LENGTH -->
+      <div class="panel" style="margin-top:16px;">
+        <h2 data-icon="📏">2. LENGTH (분량 설정)</h2>
+        
+        <div class="section">
+          <label>영상 길이 선택</label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="length" value="6" onchange="calcChars()"> 6초</label>
+            <label class="radio-item"><input type="radio" name="length" value="15" onchange="calcChars()"> 15초</label>
+            <label class="radio-item"><input type="radio" name="length" value="30" onchange="calcChars()"> 30초</label>
+            <label class="radio-item"><input type="radio" name="length" value="60" onchange="calcChars()"> 1분</label>
+          </div>
+          <div style="margin-top:10px;">
+            <label class="radio-item"><input type="radio" name="length" value="180" onchange="calcChars()"> 3분</label>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>나레이션 속도</label>
+          <select id="speed" onchange="calcChars()">
+            <option value="2">초저속: 1초에 2글자 (감정 충분, 고령층)</option>
+            <option value="2.5">저속: 1초에 2.5글자</option>
+            <option value="3" selected>표준: 1초에 3글자 ⭐ (기본)</option>
+            <option value="4">빠름: 1초에 4글자 (젊은층)</option>
+            <option value="4.5">초고속: 1초에 4.5글자 (극적)</option>
+          </select>
+        </div>
+
+        <div class="stats">
+          <div class="stat-item">
+            <div class="stat-label">목표 글자 수</div>
+            <div class="stat-value" id="targetChars">—</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-label">나레이션 타입</div>
+            <div id="voiceType" style="font-size:14px; margin-top:4px;">선택 필요</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>플랫폼</label>
+          <div class="checkbox-group">
+            <label class="checkbox-item"><input type="checkbox" name="platform" value="TikTok"> TikTok</label>
+            <label class="checkbox-item"><input type="checkbox" name="platform" value="YouTube Shorts"> YouTube Shorts</label>
+            <label class="checkbox-item"><input type="checkbox" name="platform" value="Instagram Reels"> Reels</label>
+            <label class="checkbox-item"><input type="checkbox" name="platform" value="웹사이트"> 웹사이트</label>
+            <label class="checkbox-item"><input type="checkbox" name="platform" value="TV/공공광고"> TV 광고</label>
+            <label class="checkbox-item"><input type="checkbox" name="platform" value="유튜브"> YouTube</label>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>주요 수치/성과 (선택사항)</label>
+          <input type="text" id="stats" placeholder="예: 10,237명, 500개 일자리, 69만 관광객">
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 우측: 출력 패널 ===== -->
+    <div>
+      <!-- OUTPUT 미리보기 -->
+      <div class="panel">
+        <h2 data-icon="📤">3. OUTPUT (출력 형식)</h2>
+        
+        <div class="section">
+          <label>나레이션 양식</label>
+          <select id="format">
+            <option value="1">① 일반형: [정책] [필요성] [핵심] [행동]</option>
+            <option value="2">② 숫자강조형: [수치] [의미] [정책] [행동]</option>
+            <option value="3">③ 감정희망형: [감정인정] [정책] [미래약속] [행동]</option>
+            <option value="4">④ 질문형: [질문] → [답변] → [해결] → [행동]</option>
+            <option value="5">⑤ 문제해결형: [문제] [해결책] [성과] [행동]</option>
+          </select>
+        </div>
+
+        <div class="section">
+          <label>촬영 가능 여부</label>
+          <div class="radio-group">
+            <label class="radio-item"><input type="radio" name="shoot" value="가능"> 가능 (모든 자료)</label>
+            <label class="radio-item"><input type="radio" name="shoot" value="부분"> 부분 (아카이브 필요)</label>
+            <label class="radio-item"><input type="radio" name="shoot" value="불가능"> 불가능 (자료화면)</label>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>결과물 체크리스트</label>
+          <div class="checkbox-group">
+            <label class="checkbox-item"><input type="checkbox" class="checklist" checked> 시나리오</label>
+            <label class="checkbox-item"><input type="checkbox" class="checklist" checked> 나레이션 대사본</label>
+            <label class="checkbox-item"><input type="checkbox" class="checklist" checked> 자막 시트</label>
+            <label class="checkbox-item"><input type="checkbox" class="checklist"> 음악/효과음</label>
+            <label class="checkbox-item"><input type="checkbox" class="checklist"> 촬영 레퍼런스</label>
+            <label class="checkbox-item"><input type="checkbox" class="checklist"> 성우 지시</label>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>금지 사항 (자동 포함)</label>
+          <ul style="font-size:13px; color:#6b6b6b; margin:8px 0 0; padding-left:20px;">
+            <li>❌ 정치적 색채 제거</li>
+            <li>❌ 과도한 감정 조작 금지</li>
+            <li>❌ 거짓 수치·왜곡 금지</li>
+            <li>❌ 특정 계층 차별 금지</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- WORKFLOW & 최종 액션 -->
+      <div class="panel" style="margin-top:16px;">
+        <h2 data-icon="⚙️">4. WORKFLOW (실행 절차)</h2>
+        
+        <div class="section">
+          <label>추가 정보 (선택사항)</label>
+          <textarea id="extraInfo" placeholder="참고 데이터, 특별 요청사항 등..." rows="4"></textarea>
+        </div>
+
+        <div class="button-group">
+          <button class="btn-primary" onclick="generatePrompt()">🚀 최종 프롬프트 생성</button>
+          <button class="btn-secondary" onclick="resetForm()">↺ 초기화</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 프롬프트 출력 ===== -->
+  <div class="panel" style="margin-top:20px;">
+    <h2 data-icon="📋">완성된 프롬프트</h2>
+    
+    <div class="prompt-panel">
+      <div class="prompt-label">프롬프트 (Claude/ChatGPT에 바로 붙여넣기)</div>
+      <textarea id="promptOutput" readonly>여기에 프롬프트가 생성됩니다. 위에서 입력을 완료하고 "최종 프롬프트 생성" 버튼을 클릭하세요.</textarea>
+    </div>
+
+    <div class="button-group" style="margin-top:14px;">
+      <button class="btn-copy" onclick="copyPrompt()">📋 프롬프트 복사</button>
+      <button class="btn-download" onclick="downloadPrompt()">💾 TXT 파일 다운로드</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 키워드 데이터
+const keywords = {
+  role: ['공공기관의 영상 크리에이티브 디렉터', '사회복지 정책 커뮤니케이션 전문가', '지역 관광 마케팅 브랜드 전략가'],
+  goal: [],
+  target: [],
+  tone: []
+};
+
+let selectedData = {
+  role: [],
+  goal: [],
+  target: [],
+  tone: [],
+  platform: []
+};
+
+function selectKeyword(el, type, value) {
+  el.classList.toggle('selected');
+  const idx = selectedData[type].indexOf(value);
+  if (idx > -1) selectedData[type].splice(idx, 1);
+  else selectedData[type].push(value);
+  updateSelectedDisplay(type);
+  updateProgress();
+}
+
+function updateSelectedDisplay(type) {
+  const container = document.getElementById('selected' + type.charAt(0).toUpperCase() + type.slice(1));
+  if (!container) return;
+  container.innerHTML = selectedData[type].map(v => `<span class="tag">${v.slice(0,20)}... <span class="remove" onclick="removeKeyword('${type}', '${v.replace(/'/g, "\\'")}')">×</span></span>`).join('');
+}
+
+function removeKeyword(type, value) {
+  selectedData[type] = selectedData[type].filter(v => v !== value);
+  document.querySelectorAll('.keyword-chips .chip').forEach(chip => {
+    if (chip.textContent.includes(value.slice(0,10))) chip.classList.remove('selected');
+  });
+  updateSelectedDisplay(type);
+}
+
+function calcChars() {
+  const len = document.querySelector('input[name="length"]:checked')?.value || 0;
+  const speed = parseFloat(document.getElementById('speed').value);
+  const chars = Math.round(len * speed);
+  document.getElementById('targetChars').textContent = chars ? `${chars}글자` : '—';
+}
+
+function showTab(tab, idx) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    if (i === idx) b.classList.add('active');
+    else b.classList.remove('active');
+  });
+}
+
+function updateProgress() {
+  const steps = [
+    !!document.getElementById('org').value,
+    !!document.querySelector('input[name="length"]:checked'),
+    selectedData.tone.length > 0,
+    !!document.querySelector('input[name="shoot"]:checked')
+  ];
+  document.querySelectorAll('.progress-step').forEach((s, i) => {
+    s.classList.toggle('active', steps[i]);
+  });
+}
+
+function generatePrompt() {
+  const org = document.getElementById('org').value;
+  const policy = document.getElementById('policy').value;
+  const message = document.getElementById('message').value;
+  const len = document.querySelector('input[name="length"]:checked')?.value;
+  const speed = parseFloat(document.getElementById('speed').value);
+  const chars = Math.round(len * speed);
+  const platform = Array.from(document.querySelectorAll('input[name="platform"]:checked')).map(c => c.value).join(' / ');
+  const format = document.getElementById('format').value;
+  const shoot = document.querySelector('input[name="shoot"]:checked')?.value;
+  const stats = document.getElementById('stats').value;
+  const extra = document.getElementById('extraInfo').value;
+
+  if (!org || !policy || !len) {
+    alert('⚠️ 필수 항목을 입력해주세요: 기관명, 정책명, 영상 길이');
+    return;
+  }
+
+  const prompt = `당신은 공공기관의 영상 크리에이티브 디렉터입니다.
+
+【기본 정보】
+- 기관: ${org}
+- 정책: ${policy}
+- 핵심 메시지: "${message}"
+- 영상 길이: 정확히 ${len}초
+- 플랫폼: ${platform || '지정 없음'}
+- 촬영 가능 여부: ${shoot || '미선택'}
+
+【나레이션 요구사항】
+- 목표 글자 수: ${chars}글자 (${len}초 × ${speed}글자/초)
+- 톤: ${selectedData.tone.length > 0 ? selectedData.tone.join(' + ') : '중립'}
+- 타겟: ${selectedData.target.length > 0 ? selectedData.target.join(', ') : '일반 시민'}
+- 나레이션 양식: ${format}번 사용
+- 나레이션 속도: 표준 (1초에 ${speed}글자)
+
+【핵심 통계/성과】
+${stats ? `- ${stats}` : '- (주요 수치 없음)'}
+
+【자막 및 영상】
+- 글자 크기: 한 줄에 8~12글자 (화면 여백 고려)
+- 타이밍: 나레이션과 정확히 동시
+- 색상: 흰색 (검정 배경에) 또는 브랜드 컬러
+- 첫 1초: 스크롤 멈추는 임팩트 장면
+- 마지막 1초: CTA (신청하기 / 문의하기 / 웹사이트)
+
+【금지 사항】
+- ❌ 정치적 색채
+- ❌ 과도한 감정 조작
+- ❌ 거짓 수치·왜곡
+- ❌ 특정 계층 차별
+
+【출력 형식】
+다음 형식으로 정확히 제공해주세요:
+
+### 나레이션 대사 (최종)
+[정확한 한글 음성 대사 - 정확히 ${chars}글자 범위]
+
+### 자막 시트
+| 시간 | 텍스트 | 비고 |
+|:---:|:---|:---|
+| 0:00~0:${String(Math.floor(len/3)).padStart(2,'0')} | [자막 1줄] | |
+| 0:${String(Math.floor(len/3)).padStart(2,'0')}~0:${String(Math.floor(len*2/3)).padStart(2,'0')} | [자막 2줄] | |
+| 0:${String(Math.floor(len*2/3)).padStart(2,'0')}~0:${String(len).padStart(2,'0')} | [자막 3줄] | CTA |
+
+### 영상 지시 (2~3줄)
+[화면 구성, 음악 분위기, 컷 전환 타이밍]
+
+### 검수 체크
+- 나레이션 글자 수: [총 ??글자 / 목표 ${chars}]
+- 읽는 속도: [1초 ?글자 / 목표 ${speed}]
+- 메시지 명확도: [명확/보완 필요]
+- 톤 일관성: [✓/✗]
+
+${extra ? `【추가 요청】\n${extra}\n` : ''}
+
+지금 바로 시나리오를 작성해주세요!`;
+
+  document.getElementById('promptOutput').value = prompt;
+  document.getElementById('prog2').classList.add('active');
+  document.getElementById('prog3').classList.add('active');
+}
+
+function copyPrompt() {
+  const text = document.getElementById('promptOutput').value;
+  if (!text.includes('당신은 공공기관')) {
+    alert('먼저 "최종 프롬프트 생성" 버튼을 클릭하세요.');
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✅ 프롬프트가 복사되었습니다!');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove();
+    showToast('✅ 프롬프트가 복사되었습니다!');
+  });
+}
+
+function downloadPrompt() {
+  const text = document.getElementById('promptOutput').value;
+  if (!text.includes('당신은 공공기관')) {
+    alert('먼저 "최종 프롬프트 생성" 버튼을 클릭하세요.');
+    return;
+  }
+  const org = document.getElementById('org').value || 'prompt';
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `FLOW_프롬프트_${org}_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  showToast('💾 파일이 다운로드되었습니다!');
+}
+
+function resetForm() {
+  document.querySelectorAll('input[type="text"], input[type="number"], textarea, select').forEach(el => {
+    if (el.id !== 'promptOutput') el.value = '';
+  });
+  document.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(el => {
+    if (el.className !== 'checklist' || el.checked) el.checked = el.className === 'checklist' && el.closest('.checkbox-group');
+  });
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('selected'));
+  selectedData = { role: [], goal: [], target: [], tone: [], platform: [] };
+  document.getElementById('promptOutput').value = '초기화되었습니다. 다시 입력해주세요.';
+  updateProgress();
+  showToast('↺ 모든 입력값이 초기화되었습니다!');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+// 초기화
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('input').forEach(i => i.addEventListener('change', updateProgress));
+  calcChars();
+});
+</script>
+</body>
+</html>
